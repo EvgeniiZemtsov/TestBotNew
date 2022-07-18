@@ -1,12 +1,14 @@
 package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+@Slf4j
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
 
@@ -33,9 +35,12 @@ public class TelegramBot extends TelegramLongPollingBot {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
 
+            log.info("User message : " + messageText);
+
             switch (messageText) {
                 case "/start":
                     startCommandAction(chatId, update.getMessage().getChat().getFirstName());
+                    log.info("Executed command /start");
                     break;
                 default:
                     sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
@@ -52,6 +57,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 "I'm glad to see you here!!!";
 
         sendMessage(chatId, answer);
+        log.info("Replied to user : + " + name + " , command /start");
     }
 
     private void sendMessage(long chatId, String textToSend) {
@@ -62,7 +68,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-
+            log.error("The error occurred while sending message: " + e.getMessage());
         }
     }
 }
