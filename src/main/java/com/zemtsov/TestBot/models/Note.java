@@ -10,7 +10,7 @@ public class Note {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "Created by")
+    @Column(name = "Owner")
     private Long userId;
 
     @Column(nullable = false)
