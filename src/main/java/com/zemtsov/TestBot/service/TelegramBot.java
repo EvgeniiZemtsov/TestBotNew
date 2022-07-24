@@ -1,22 +1,29 @@
 package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
+import com.zemtsov.TestBot.models.User;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
+
+    @Autowired
+    private UserService userService;
 
     final BotConfig config;
     private final String HELP_MESSAGE = "This is my firs Telegram bot, created to learn how to work with Telegram API\n\n" +
@@ -56,6 +63,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             switch (messageText) {
                 case "/start":
+                    registerUser(update);
                     startCommandAction(chatId, update.getMessage().getChat().getFirstName());
                     log.info("Executed command /start");
                     break;
@@ -99,8 +107,29 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/start", "get welcome message"));
         listOfCommands.add(new BotCommand("/mydata", "get my data"));
         listOfCommands.add(new BotCommand("/deletedata", "deleting user data"));
+        listOfCommands.add(new BotCommand("/createNote", "creating a new note"));
         listOfCommands.add(new BotCommand("/help", "get help message"));
 
         return listOfCommands;
+    }
+
+    private void registerUser(Update update) {
+
+        if (userService.findUserById(update.getMessage().getChatId()).isEmpty()) {
+            Long chatId = update.getMessage().getChatId();
+            Chat chat = update.getMessage().getChat();
+
+            User user = new User();
+
+            user.setChatId(chatId);
+            user.setUserName(chat.getUserName());
+            user.setFirstName(chat.getFirstName());
+            user.setLastName(chat.getLastName());
+            user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
+
+            userService.saveUser(user);
+
+            log.info("New user has been saved: " + user);
+        }
     }
 }
