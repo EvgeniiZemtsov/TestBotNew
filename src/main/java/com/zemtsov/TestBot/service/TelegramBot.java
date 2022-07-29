@@ -31,11 +31,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     final BotConfig config;
     private final String HELP_MESSAGE = "This is my firs Telegram bot, created to learn how to work with Telegram API\n\n" +
             "You can execute the following commands by choosing them from menu or by typing them: \n\n" +
-            "/start for getting a welcome message\n\n" +
+            "/start for starting using the bot\n\n" +
             "/mydata for checking you personal data\n\n" +
             "/deletedata for deleting your data\n\n" +
             "/createnote for creating a note\n\n" +
-            "/setemail for setting your email" +
+            "/setemail for setting your email\n\n" +
             "/help for checking the help desk\n\n" ;
 
     public TelegramBot(BotConfig config) {
@@ -72,9 +72,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     startCommandAction(chatId, update.getMessage().getChat().getFirstName());
                     break;
                 case "/mydata":
-                    returnUserHisData(chatId);
-                    botState = BotState.DEFAULT;
-                    log.info("Executed command /mydata");
+                    myDataCommandAction(chatId);
                     break;
                 case "/setemail":
                     setEmailCommandAction(chatId);
@@ -92,15 +90,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     }
 
-    private void returnUserHisData(long chatId) {
-        Optional<User> user = userService.findUserById(chatId);
-        String userInformation = "Your user name is " + user.get().getUserName() + "\n" +
-                "Your first name is " + user.get().getFirstName() + "\n" +
-                "Your last name is " + user.get().getLastName() + "\n" +
-                "You first messaged the bot " + user.get().getRegisteredAt();
-        sendMessage(chatId, userInformation);
-    }
-
     private void startCommandAction(long chatId, String name) {
 
         String answer = "Hello, " + name + "!!!\n" +
@@ -113,10 +102,25 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("Executed command /start");
     }
 
+    private void myDataCommandAction(long chatId) {
+        returnUserHisData(chatId);
+        botState = BotState.DEFAULT;
+        log.info("Executed command /mydata");
+    }
+
     private void setEmailCommandAction(long chatId) {
         botState = BotState.SET_EMAIL;
         sendMessage(chatId, "Enter your email: ");
         log.info("Executed command /setemail");
+    }
+
+    private void handleTextMessage(String text, long chatId) {
+        if (botState.equals(BotState.SET_EMAIL)) {
+            userService.updateUser(chatId, text);
+            botState = BotState.DEFAULT;
+        } else {
+            sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
+        }
     }
 
     private void sendMessage(long chatId, String textToSend) {
@@ -134,7 +138,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private List<BotCommand> addBotCommands() {
         List<BotCommand> listOfCommands = new ArrayList<>();
 
-        listOfCommands.add(new BotCommand("/start", "get welcome message"));
+        listOfCommands.add(new BotCommand("/start", "start using bot"));
         listOfCommands.add(new BotCommand("/mydata", "get my data"));
         listOfCommands.add(new BotCommand("/deletedata", "deleting user data"));
         listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
@@ -164,12 +168,27 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleTextMessage(String text, long chatId) {
-        if (botState.equals(BotState.SET_EMAIL)) {
-            userService.updateUser(chatId, text);
+    private void returnUserHisData(long chatId) {
+        Optional<User> userOptional = userService.findUserById(chatId);
+        User user = null;
+
+        if (userOptional.isPresent()) {
+            user = userOptional.get();
         } else {
-            sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
+            return;
         }
+        StringBuilder userInf = new StringBuilder("Your first name is " + user.getFirstName() + "\n" +
+                "Your last name is " + user.getLastName() + "\n" +
+                "You first messaged the bot " + user.getRegisteredAt());
+        if (user.getUserName() != null) {
+            userInf.append("\n" +
+                    "Your user name is " + user.getUserName());
+        }
+        if (user.getEmail() != null) {
+            userInf.append("\n" +
+                    "Your email is " + user.getEmail());
+        }
+        sendMessage(chatId, userInf.toString());
     }
 
     enum BotState {
