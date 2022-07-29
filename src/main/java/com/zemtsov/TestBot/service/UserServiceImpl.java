@@ -3,6 +3,7 @@ package com.zemtsov.TestBot.service;
 import com.zemtsov.TestBot.models.User;
 import com.zemtsov.TestBot.repositories.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +29,16 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User saveUser(User user) {
-         return repository.save(user);
+        return repository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void updateUser(Long id, String email) {
+        User user = repository.findById(id).orElseThrow(() -> new IllegalStateException("User with id = " + id + " doesn't exist"));
+
+        if (!email.isEmpty()) {
+            user.setEmail(email);
+        }
     }
 }
