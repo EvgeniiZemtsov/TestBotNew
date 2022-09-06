@@ -2,20 +2,27 @@ package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
 import com.zemtsov.TestBot.models.User;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.cfg.NotYetImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Chat;
+import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,8 +64,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         return config.getToken();
     }
 
+    @SneakyThrows
     @Override
     public void onUpdateReceived(Update update) {
+        if (update.hasCallbackQuery()) {
+            handleCallback(update.getCallbackQuery());
+        }
 
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
@@ -77,6 +88,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/setemail":
                     setEmailCommandAction(chatId);
                     break;
+                case "/setgender":
+                    setGenderCommandAction(chatId);
+                    break;
                 case "/help":
                     sendMessage(chatId, HELP_MESSAGE);
                     botState = BotState.DEFAULT;
@@ -88,6 +102,50 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
 
+    }
+
+    private void setGenderCommandAction(long chatId) throws TelegramApiException {
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+        buttons.add(Arrays.asList(
+                InlineKeyboardButton
+                        .builder()
+                        .text("Male")
+                        .callbackData("Gender:Male")
+                        .build(),
+                InlineKeyboardButton
+                        .builder()
+                        .text("Female")
+                        .callbackData("Gender:Female")
+                        .build()
+        ));
+        execute(
+                SendMessage.builder()
+                        .text("Please choose your gender")
+                        .chatId(String.valueOf(chatId))
+                        .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                        .build());
+        botState = BotState.DEFAULT;
+        log.info("Executed command /setgender");
+    }
+
+    private void handleCallback(CallbackQuery callbackQuery) {
+        Message message = callbackQuery.getMessage();
+
+        String[] tokens = callbackQuery.getData().split(":");
+        if (tokens[0].equals("Gender")) {
+            switch (tokens[1]) {
+                case "Male":
+                    userService.updateUser(message.getChatId(), null, "male");
+                    break;
+                case "Female":
+                    userService.updateUser(message.getChatId(), null,"female");
+                    break;
+                default:
+
+            }
+        } else {
+            throw new NotYetImplementedException("We are still working on implementing this feature");
+        }
     }
 
     private void startCommandAction(long chatId, String name) {
@@ -116,7 +174,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleTextMessage(String text, long chatId) {
         if (botState.equals(BotState.SET_EMAIL)) {
-            userService.updateUser(chatId, text);
+            userService.updateUser(chatId, text, null);
             botState = BotState.DEFAULT;
         } else {
             sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
@@ -143,6 +201,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/deletedata", "deleting user data"));
         listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
         listOfCommands.add(new BotCommand("/setemail", "setting user's email"));
+        listOfCommands.add(new BotCommand("/setgender", "setting user's gender"));
         listOfCommands.add(new BotCommand("/help", "get help message"));
 
         return listOfCommands;
@@ -177,17 +236,26 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else {
             return;
         }
+
         StringBuilder userInf = new StringBuilder("Your first name is " + user.getFirstName() + "\n" +
                 "Your last name is " + user.getLastName() + "\n" +
                 "You first messaged the bot " + user.getRegisteredAt());
+
         if (user.getUserName() != null) {
             userInf.append("\n" +
                     "Your user name is " + user.getUserName());
         }
+
+        if (user.getGender() != null) {
+            userInf.append("\n" +
+                    "Your gender is " + user.getGender());
+        }
+
         if (user.getEmail() != null) {
             userInf.append("\n" +
                     "Your email is " + user.getEmail());
         }
+
         sendMessage(chatId, userInf.toString());
     }
 

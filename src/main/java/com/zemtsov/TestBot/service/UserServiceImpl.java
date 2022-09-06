@@ -34,11 +34,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void updateUser(Long id, String email) {
+    public void updateUser(Long id, String email, String gender) {
         User user = repository.findById(id).orElseThrow(() -> new IllegalStateException("User with id = " + id + " doesn't exist"));
 
-        if (!email.isEmpty()) {
+        if (email != null && !email.isEmpty()) {
             user.setEmail(email);
+        }
+
+        if (gender != null && !gender.isEmpty()) {
+            user.setGender(gender);
         }
     }
 }

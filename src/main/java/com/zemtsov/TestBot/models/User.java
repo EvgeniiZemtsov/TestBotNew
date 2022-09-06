@@ -15,6 +15,7 @@ public class User {
     private String firstName;
     private String lastName;
     private String userName;
+    private String gender;
     private Timestamp registeredAt;
     private String email;
 
