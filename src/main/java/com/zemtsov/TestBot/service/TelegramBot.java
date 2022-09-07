@@ -8,6 +8,7 @@ import org.hibernate.cfg.NotYetImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -142,6 +143,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
                 default:
 
+            }
+            try {
+                execute(AnswerCallbackQuery.builder()
+                        .cacheTime(10)
+                        .text("You've successfully set your gender. Now it's " + tokens[1])
+                        .showAlert(true)
+                        .callbackQueryId(callbackQuery.getId())
+                        .build());
+            } catch (TelegramApiException e) {
+                log.error(e.getMessage());
             }
         } else {
             throw new NotYetImplementedException("We are still working on implementing this feature");
