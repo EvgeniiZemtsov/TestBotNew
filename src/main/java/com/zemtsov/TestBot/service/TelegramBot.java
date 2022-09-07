@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -203,8 +205,22 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleTextMessage(String text, long chatId) {
         if (botState.equals(BotState.SET_EMAIL)) {
-            userService.updateUser(chatId, text, null);
-            botState = BotState.DEFAULT;
+            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+            if (Pattern.matches(emailRegex, text)) {
+                userService.updateUser(chatId, text, null);
+                botState = BotState.DEFAULT;
+            } else {
+                try {
+                    execute(
+                            SendMessage.builder()
+                                    .text("Looks like " + text + " is not a valid email. Please enter a valid email.")
+                                    .chatId(String.valueOf(chatId))
+                                    .build()
+                    );
+                } catch (TelegramApiException e) {
+                    log.error(e.getMessage());
+                }
+            }
         } else {
             sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
         }
