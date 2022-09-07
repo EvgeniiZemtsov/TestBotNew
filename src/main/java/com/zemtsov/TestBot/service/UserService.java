@@ -12,5 +12,6 @@ public interface UserService {
     Optional<User> findUserById(Long id);
     User saveUser(User user);
     void updateUser(Long id, String email, String gender);
+    void deleteUserById(Long id);
 
 }

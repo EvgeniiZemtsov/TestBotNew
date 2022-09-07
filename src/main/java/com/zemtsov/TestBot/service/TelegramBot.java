@@ -86,6 +86,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/mydata":
                     myDataCommandAction(chatId);
                     break;
+                case "/deletedata":
+                    deleteDataCommandAction(chatId);
+                    break;
                 case "/setemail":
                     setEmailCommandAction(chatId);
                     break;
@@ -103,6 +106,21 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
 
+    }
+
+    private void deleteDataCommandAction(long chatId) {
+        userService.deleteUserById(chatId);
+        log.warn("The user with id = " + chatId + " was deleted from database");
+        try {
+            execute(
+                    SendMessage.builder()
+                            .text("Your data was deleted from Bot's database")
+                            .chatId(String.valueOf(chatId))
+                            .build()
+            );
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage());
+        }
     }
 
     private void setGenderCommandAction(long chatId) throws TelegramApiException {

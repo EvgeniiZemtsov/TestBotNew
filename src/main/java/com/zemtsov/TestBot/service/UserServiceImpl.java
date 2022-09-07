@@ -45,4 +45,10 @@ public class UserServiceImpl implements UserService {
             user.setGender(gender);
         }
     }
+
+    @Override
+    public void deleteUserById(Long id) {
+        User user = repository.findById(id).orElseThrow(() -> new IllegalStateException("User with id = " + id + " doesn't exist"));
+        repository.delete(user);
+    }
 }
