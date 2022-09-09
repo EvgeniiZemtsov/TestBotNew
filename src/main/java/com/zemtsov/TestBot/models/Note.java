@@ -14,7 +14,6 @@ public class Note {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "chat_id", nullable = false)
     private User user;
 
     @Column(nullable = false)

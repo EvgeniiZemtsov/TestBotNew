@@ -151,7 +151,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                         .callbackData("Gender:Female")
                         .build()
         ));
-        sendMessage(chatId, "Please choose your gender");
+        try {
+            execute(
+                    SendMessage.builder()
+                            .text("Please choose your gender")
+                            .chatId(String.valueOf(chatId))
+                            .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                            .build());
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage());
+        }
         botState = BotState.DEFAULT;
         log.info("Executed command /setgender");
     }

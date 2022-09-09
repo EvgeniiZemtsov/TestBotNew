@@ -22,7 +22,7 @@ public class User {
     private Timestamp registeredAt;
     private String email;
 
-    @OneToMany(cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<Note> notes;
 
 
