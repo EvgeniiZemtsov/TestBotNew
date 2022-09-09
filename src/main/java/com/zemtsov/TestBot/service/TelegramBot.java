@@ -1,6 +1,7 @@
 package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
+import com.zemtsov.TestBot.models.Note;
 import com.zemtsov.TestBot.models.User;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private NoteService noteService;
 
     BotState botState = BotState.DEFAULT;
 
@@ -45,6 +48,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             "/mydata for checking you personal data\n\n" +
             "/deletedata for deleting your data\n\n" +
             "/createnote for creating a note\n\n" +
+            "/setgender for setting your gender\n\n" +
             "/setemail for setting your email\n\n" +
             "/help for checking the help desk\n\n" ;
 
@@ -97,6 +101,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/setgender":
                     setGenderCommandAction(chatId);
                     break;
+                case "/createnote":
+                    createNoteCommand(chatId);
+                    break;
                 case "/help":
                     sendMessage(chatId, HELP_MESSAGE);
                     botState = BotState.DEFAULT;
@@ -108,6 +115,11 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
 
+    }
+
+    private void createNoteCommand(long chatId) {
+        botState = BotState.CREATE_NOTE;
+        sendMessage(chatId, "Enter your note please:");
     }
 
     private void deleteDataCommandAction(long chatId) {
@@ -125,7 +137,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void setGenderCommandAction(long chatId) throws TelegramApiException {
+    private void setGenderCommandAction(long chatId) {
         List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
         buttons.add(Arrays.asList(
                 InlineKeyboardButton
@@ -139,12 +151,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         .callbackData("Gender:Female")
                         .build()
         ));
-        execute(
-                SendMessage.builder()
-                        .text("Please choose your gender")
-                        .chatId(String.valueOf(chatId))
-                        .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
-                        .build());
+        sendMessage(chatId, "Please choose your gender");
         botState = BotState.DEFAULT;
         log.info("Executed command /setgender");
     }
@@ -204,25 +211,37 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleTextMessage(String text, long chatId) {
-        if (botState.equals(BotState.SET_EMAIL)) {
-            String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
-            if (Pattern.matches(emailRegex, text)) {
-                userService.updateUser(chatId, text, null);
-                botState = BotState.DEFAULT;
-            } else {
-                try {
-                    execute(
-                            SendMessage.builder()
-                                    .text("Looks like " + text + " is not a valid email. Please enter a valid email.")
-                                    .chatId(String.valueOf(chatId))
-                                    .build()
-                    );
-                } catch (TelegramApiException e) {
-                    log.error(e.getMessage());
-                }
-            }
+        switch (botState) {
+            case SET_EMAIL:
+                setUsersEmail(text, chatId);
+                break;
+            case CREATE_NOTE:
+                createNote(text, chatId);
+                break;
+            default:
+                sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
+                break;
+        }
+    }
+
+    private void createNote(String text, long chatId) {
+        Note note = new Note();
+        Optional<User> user = userService.findUserById(chatId);
+        note.setDescription(text);
+        note.setDate(new Timestamp(System.currentTimeMillis()));
+        user.ifPresent(note::setUser);
+        noteService.saveNote(note);
+        botState = BotState.DEFAULT;
+        log.info("New note was added by user with id " + chatId);
+    }
+
+    private void setUsersEmail(String text, long chatId) {
+        String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
+        if (Pattern.matches(emailRegex, text)) {
+            userService.updateUser(chatId, text, null);
+            botState = BotState.DEFAULT;
         } else {
-            sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
+            sendMessage(chatId, "Looks like " + text + " is not a valid email. Please enter a valid email.");
         }
     }
 
@@ -247,6 +266,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
         listOfCommands.add(new BotCommand("/setemail", "setting user's email"));
         listOfCommands.add(new BotCommand("/setgender", "setting user's gender"));
+        listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
         listOfCommands.add(new BotCommand("/help", "get help message"));
 
         return listOfCommands;
