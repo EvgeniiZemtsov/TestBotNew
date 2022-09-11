@@ -105,6 +105,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case "/createnote":
                         createNoteCommand(chatId);
                         break;
+                    case "/mynotes":
+                        showUsersNoteCommand(chatId);
+                        break;
                     case "/help":
                         sendMessage(chatId, HELP_MESSAGE);
                         botState = BotState.DEFAULT;
@@ -141,6 +144,17 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error(e.getMessage());
         }
         botState = BotState.STOPPED;
+    }
+
+    private void showUsersNoteCommand(long chatId) {
+        botState = BotState.DEFAULT;
+        List<Note> allNotes = noteService.getAllNotes();
+        for (Note note : allNotes) {
+            User user = note.getUser();
+            if (user != null && user.getChatId().equals(chatId)) {
+                sendMessage(chatId, note.getDescription());
+            }
+        }
     }
 
     private void setGenderCommandAction(long chatId) {
@@ -282,6 +296,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         listOfCommands.add(new BotCommand("/setemail", "setting user's email"));
         listOfCommands.add(new BotCommand("/setgender", "setting user's gender"));
         listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
+        listOfCommands.add(new BotCommand("/mynotes", "creating a new note"));
         listOfCommands.add(new BotCommand("/help", "get help message"));
 
         return listOfCommands;
