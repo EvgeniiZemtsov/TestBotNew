@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -39,7 +38,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     private NoteService noteService;
 
-    BotState botState = BotState.DEFAULT;
+    BotState botState = BotState.STOPPED;
 
     final BotConfig config;
     private final String HELP_MESSAGE = "This is my firs Telegram bot, created to learn how to work with Telegram API\n\n" +
@@ -50,7 +49,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             "/createnote for creating a note\n\n" +
             "/setgender for setting your gender\n\n" +
             "/setemail for setting your email\n\n" +
-            "/help for checking the help desk\n\n" ;
+            "/help for checking the help desk\n\n";
 
     public TelegramBot(BotConfig config) {
         this.config = config;
@@ -74,45 +73,51 @@ public class TelegramBot extends TelegramLongPollingBot {
     @SneakyThrows
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasCallbackQuery()) {
-            handleCallback(update.getCallbackQuery());
-        }
-
-        if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText();
-            long chatId = update.getMessage().getChatId();
-
-            log.info("User message : " + messageText);
-
-            switch (messageText) {
-                case "/start":
-                    registerUser(update);
-                    startCommandAction(chatId, update.getMessage().getChat().getFirstName());
-                    break;
-                case "/mydata":
-                    myDataCommandAction(chatId);
-                    break;
-                case "/deletedata":
-                    deleteDataCommandAction(chatId);
-                    break;
-                case "/setemail":
-                    setEmailCommandAction(chatId);
-                    break;
-                case "/setgender":
-                    setGenderCommandAction(chatId);
-                    break;
-                case "/createnote":
-                    createNoteCommand(chatId);
-                    break;
-                case "/help":
-                    sendMessage(chatId, HELP_MESSAGE);
-                    botState = BotState.DEFAULT;
-                    log.info("Executed command /help");
-                    break;
-                default:
-                    handleTextMessage(messageText, chatId);
+        if (update.hasMessage()
+                && update.getMessage().hasText()
+                && update.getMessage().getText().equals("/start")) {
+            startCommandAction(update.getMessage().getChatId(), update.getMessage().getChat().getFirstName());
+            registerUser(update);
+        } else if (botState != BotState.STOPPED) {
+            if (update.hasCallbackQuery()) {
+                handleCallback(update.getCallbackQuery());
             }
 
+            if (update.hasMessage() && update.getMessage().hasText()) {
+                String messageText = update.getMessage().getText();
+                long chatId = update.getMessage().getChatId();
+
+                log.info("User message : " + messageText);
+
+                switch (messageText) {
+                    case "/mydata":
+                        myDataCommandAction(chatId);
+                        break;
+                    case "/deletedata":
+                        deleteDataCommandAction(chatId);
+                        break;
+                    case "/setemail":
+                        setEmailCommandAction(chatId);
+                        break;
+                    case "/setgender":
+                        setGenderCommandAction(chatId);
+                        break;
+                    case "/createnote":
+                        createNoteCommand(chatId);
+                        break;
+                    case "/help":
+                        sendMessage(chatId, HELP_MESSAGE);
+                        botState = BotState.DEFAULT;
+                        log.info("Executed command /help");
+                        break;
+                    default:
+                        handleTextMessage(messageText, chatId);
+                }
+
+            }
+        } else {
+            sendMessage(update.getMessage().getChatId(),
+                    "You have deleted your data and stopped the bot. Please press /start command to start using the bot again.");
         }
 
     }
@@ -135,6 +140,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             log.error(e.getMessage());
         }
+        botState = BotState.STOPPED;
     }
 
     private void setGenderCommandAction(long chatId) {
@@ -175,7 +181,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userService.updateUser(message.getChatId(), null, "male");
                     break;
                 case "Female":
-                    userService.updateUser(message.getChatId(), null,"female");
+                    userService.updateUser(message.getChatId(), null, "female");
                     break;
                 default:
 
@@ -336,6 +342,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     enum BotState {
         DEFAULT,
         CREATE_NOTE,
-        SET_EMAIL
+        SET_EMAIL,
+        STOPPED
     }
 }
