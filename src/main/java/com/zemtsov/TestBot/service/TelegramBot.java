@@ -78,6 +78,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 && update.getMessage().getText().equals("/start")) {
             startCommandAction(update.getMessage().getChatId(), update.getMessage().getChat().getFirstName());
             registerUser(update);
+
         } else if (botState != BotState.STOPPED) {
             if (update.hasCallbackQuery()) {
                 handleCallback(update.getCallbackQuery());
@@ -152,7 +153,30 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Note note : allNotes) {
             User user = note.getUser();
             if (user != null && user.getChatId().equals(chatId)) {
-                sendMessage(chatId, note.getDescription());
+                List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+                buttons.add(Arrays.asList(
+                        InlineKeyboardButton
+                                .builder()
+                                .text("Edit✏️")
+                                .callbackData("NoteAction:Edit:" + note.getId())
+                                .build(),
+                        InlineKeyboardButton
+                                .builder()
+                                .text("Delete\uD83D\uDDD1")
+                                .callbackData("NoteAction:Delete:" + note.getId())
+                                .build()
+                ));
+                try {
+                    execute(
+                            SendMessage.builder()
+                                    .text(note.getDescription())
+                                    .chatId(String.valueOf(chatId))
+                                    .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                                    .build()
+                    );
+                } catch (TelegramApiException e) {
+                    log.error(e.getMessage());
+                }
             }
         }
     }
@@ -187,6 +211,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleCallback(CallbackQuery callbackQuery) {
         Message message = callbackQuery.getMessage();
+        log.info("Handling calbackQuery : " + callbackQuery.getData());
 
         String[] tokens = callbackQuery.getData().split(":");
         if (tokens[0].equals("Gender")) {
@@ -210,6 +235,27 @@ public class TelegramBot extends TelegramLongPollingBot {
             } catch (TelegramApiException e) {
                 log.error(e.getMessage());
             }
+        } else if (tokens[0].equals("NoteAction")) {
+            switch (tokens[1]) {
+                case "Edit":
+                    sendMessage(callbackQuery.getMessage().getChatId(), "We will edit note with id = " + tokens[2] + " later.");
+                    break;
+                case "Delete":
+                    noteService.deleteNoteById(Long.parseLong(tokens[2]));
+                    try {
+                        execute(AnswerCallbackQuery.builder()
+                                .cacheTime(10)
+                                .text("Note was deleted")
+                                .showAlert(true)
+                                .callbackQueryId(callbackQuery.getId())
+                                .build());
+                    } catch (TelegramApiException e) {
+                        log.error(e.getMessage());
+                    }
+                    break;
+                default:
+            }
+
         } else {
             throw new NotYetImplementedException("We are still working on implementing this feature");
         }
@@ -291,12 +337,12 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         listOfCommands.add(new BotCommand("/start", "start using bot"));
         listOfCommands.add(new BotCommand("/mydata", "get my data"));
-        listOfCommands.add(new BotCommand("/deletedata", "deleting user data"));
-        listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
-        listOfCommands.add(new BotCommand("/setemail", "setting user's email"));
-        listOfCommands.add(new BotCommand("/setgender", "setting user's gender"));
-        listOfCommands.add(new BotCommand("/createnote", "creating a new note"));
-        listOfCommands.add(new BotCommand("/mynotes", "creating a new note"));
+        listOfCommands.add(new BotCommand("/deletedata", "delete my data"));
+        listOfCommands.add(new BotCommand("/createnote", "create a new note"));
+        listOfCommands.add(new BotCommand("/setemail", "set my email"));
+        listOfCommands.add(new BotCommand("/setgender", "set my gender"));
+        listOfCommands.add(new BotCommand("/createnote", "create new note"));
+        listOfCommands.add(new BotCommand("/mynotes", "show my notes"));
         listOfCommands.add(new BotCommand("/help", "get help message"));
 
         return listOfCommands;

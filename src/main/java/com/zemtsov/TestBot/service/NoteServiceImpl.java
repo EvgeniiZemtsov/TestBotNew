@@ -32,6 +32,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public void deleteNoteById(Long id) {
-
+        Note note = repository.findById(id).orElseThrow(() -> new IllegalStateException("Note with id = " + id + " doesn't exist"));
+        repository.delete(note);
     }
 }
