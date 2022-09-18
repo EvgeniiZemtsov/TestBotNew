@@ -23,11 +23,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -149,34 +147,45 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void showUsersNoteCommand(long chatId) {
         botState = BotState.DEFAULT;
-        List<Note> allNotes = noteService.getAllNotes();
-        for (Note note : allNotes) {
-            User user = note.getUser();
-            if (user != null && user.getChatId().equals(chatId)) {
-                List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
-                buttons.add(Arrays.asList(
-                        InlineKeyboardButton
-                                .builder()
-                                .text("Edit✏️")
-                                .callbackData("NoteAction:Edit:" + note.getId())
-                                .build(),
-                        InlineKeyboardButton
-                                .builder()
-                                .text("Delete\uD83D\uDDD1")
-                                .callbackData("NoteAction:Delete:" + note.getId())
-                                .build()
-                ));
-                try {
-                    execute(
-                            SendMessage.builder()
-                                    .text(note.getDescription())
-                                    .chatId(String.valueOf(chatId))
-                                    .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+        List<Note> allNotes = noteService.getAllNotes().isEmpty() ? Collections.emptyList() : noteService.getAllNotes();
+        List<Note> usersNotes;
+        if (!allNotes.isEmpty()) {
+            usersNotes = allNotes.stream().filter(note -> note.getUser().getChatId().equals(chatId)).collect(Collectors.toList());
+        } else {
+            sendMessage(chatId, "There are no any notes in bot's db");
+            return;
+        }
+
+        if (usersNotes.isEmpty()) {
+            sendMessage(chatId, "You don't have any notes yet.\n\n" +
+                    "Create new note using command /createnote");
+        } else {
+            for (Note note : usersNotes) {
+                    List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+                    buttons.add(Arrays.asList(
+                            InlineKeyboardButton
+                                    .builder()
+                                    .text("Edit✏️")
+                                    .callbackData("NoteAction:Edit:" + note.getId())
+                                    .build(),
+                            InlineKeyboardButton
+                                    .builder()
+                                    .text("Delete\uD83D\uDDD1")
+                                    .callbackData("NoteAction:Delete:" + note.getId())
                                     .build()
-                    );
-                } catch (TelegramApiException e) {
-                    log.error(e.getMessage());
-                }
+                    ));
+                    try {
+                        execute(
+                                SendMessage.builder()
+                                        .text(note.getDescription())
+                                        .chatId(String.valueOf(chatId))
+                                        .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                                        .build()
+                        );
+                    } catch (TelegramApiException e) {
+                        log.error(e.getMessage());
+                    }
+//                }
             }
         }
     }
