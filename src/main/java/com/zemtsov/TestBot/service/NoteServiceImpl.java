@@ -3,6 +3,7 @@ package com.zemtsov.TestBot.service;
 import com.zemtsov.TestBot.models.Note;
 import com.zemtsov.TestBot.repositories.NoteRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -26,8 +27,13 @@ public class NoteServiceImpl implements NoteService {
     }
 
     @Override
+    @Transactional
     public void updateNote(Long id, String description) {
+        Note note = repository.findById(id).orElseThrow(() -> new IllegalStateException("Note with id = " + id + " doesn't exist"));
 
+        if (description != null) {
+            note.setDescription(description);
+        }
     }
 
     @Override

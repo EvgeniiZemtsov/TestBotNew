@@ -12,6 +12,7 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -37,6 +38,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private NoteService noteService;
 
     BotState botState = BotState.STOPPED;
+    List<String> buffer = new ArrayList<>();
 
     final BotConfig config;
     private final String HELP_MESSAGE = "This is my firs Telegram bot, created to learn how to work with Telegram API\n\n" +
@@ -161,31 +163,30 @@ public class TelegramBot extends TelegramLongPollingBot {
                     "Create new note using command /createnote");
         } else {
             for (Note note : usersNotes) {
-                    List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
-                    buttons.add(Arrays.asList(
-                            InlineKeyboardButton
-                                    .builder()
-                                    .text("Edit✏️")
-                                    .callbackData("NoteAction:Edit:" + note.getId())
-                                    .build(),
-                            InlineKeyboardButton
-                                    .builder()
-                                    .text("Delete\uD83D\uDDD1")
-                                    .callbackData("NoteAction:Delete:" + note.getId())
+                List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+                buttons.add(Arrays.asList(
+                        InlineKeyboardButton
+                                .builder()
+                                .text("Edit✏️")
+                                .callbackData("NoteAction:Edit:" + note.getId())
+                                .build(),
+                        InlineKeyboardButton
+                                .builder()
+                                .text("Delete\uD83D\uDDD1")
+                                .callbackData("NoteAction:Delete:" + note.getId())
+                                .build()
+                ));
+                try {
+                    execute(
+                            SendMessage.builder()
+                                    .text(note.getDescription())
+                                    .chatId(String.valueOf(chatId))
+                                    .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
                                     .build()
-                    ));
-                    try {
-                        execute(
-                                SendMessage.builder()
-                                        .text(note.getDescription())
-                                        .chatId(String.valueOf(chatId))
-                                        .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
-                                        .build()
-                        );
-                    } catch (TelegramApiException e) {
-                        log.error(e.getMessage());
-                    }
-//                }
+                    );
+                } catch (TelegramApiException e) {
+                    log.error(e.getMessage());
+                }
             }
         }
     }
@@ -247,7 +248,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else if (tokens[0].equals("NoteAction")) {
             switch (tokens[1]) {
                 case "Edit":
-                    sendMessage(callbackQuery.getMessage().getChatId(), "We will edit note with id = " + tokens[2] + " later.");
+                    sendMessage(callbackQuery.getMessage().getChatId(), "Enter new note' s text here ⬇️");
+                    botState = BotState.EDIT_NOTE;
+                    if (!buffer.isEmpty()) {
+                        buffer.clear();
+                    }
+                    buffer.add(tokens[2]);
+                    buffer.add(String.valueOf(callbackQuery.getMessage().getMessageId()));
                     break;
                 case "Delete":
                     noteService.deleteNoteById(Long.parseLong(tokens[2]));
@@ -302,6 +309,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             case CREATE_NOTE:
                 createNote(text, chatId);
                 break;
+            case EDIT_NOTE:
+                editNote(text, chatId);
+                break;
             default:
                 sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
                 break;
@@ -317,6 +327,24 @@ public class TelegramBot extends TelegramLongPollingBot {
         noteService.saveNote(note);
         botState = BotState.DEFAULT;
         log.info("New note was added by user with id " + chatId);
+    }
+
+    private void editNote(String text, long chatId) {
+        noteService.updateNote(Long.parseLong(buffer.get(0)), text);
+
+        EditMessageText editMessage = new EditMessageText();
+        editMessage.setMessageId(Integer.parseInt(buffer.get(1)));
+        editMessage.setText(text);
+        editMessage.setChatId(String.valueOf(chatId));
+        try {
+            execute(editMessage);
+        } catch (TelegramApiException e) {
+            log.error("Error while editing message. " + e.getMessage());
+        }
+
+        sendMessage(chatId, "You have successfully edited the note \uD83D\uDC4D");
+        buffer.clear();
+        botState = BotState.DEFAULT;
     }
 
     private void setUsersEmail(String text, long chatId) {
@@ -412,6 +440,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     enum BotState {
         DEFAULT,
         CREATE_NOTE,
+        EDIT_NOTE,
         SET_EMAIL,
         STOPPED
     }
