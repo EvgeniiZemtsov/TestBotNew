@@ -127,8 +127,35 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void createNoteCommand(long chatId) {
-        botState = BotState.CREATE_NOTE;
-        sendMessage(chatId, "Enter your note please:");
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+        buttons.add(Arrays.asList(
+                InlineKeyboardButton
+                        .builder()
+                        .text("❗️Important")
+                        .callbackData("NoteStatus:Important")
+                        .build(),
+                InlineKeyboardButton
+                        .builder()
+                        .text("⚠️Normal")
+                        .callbackData("NoteStatus:Normal")
+                        .build(),
+                InlineKeyboardButton
+                        .builder()
+                        .text("\uD83D\uDCDDTo-Do")
+                        .callbackData("NoteStatus:To-Do")
+                        .build()
+        ));
+        try {
+            execute(
+                    SendMessage.builder()
+                            .text("What kind of note are you going to create?")
+                            .chatId(String.valueOf(chatId))
+                            .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                            .build());
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage());
+        }
+
     }
 
     private void deleteDataCommandAction(long chatId) {
@@ -248,7 +275,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else if (tokens[0].equals("NoteAction")) {
             switch (tokens[1]) {
                 case "Edit":
-                    sendMessage(callbackQuery.getMessage().getChatId(), "Enter new note' s text here ⬇️");
+                    sendMessage(callbackQuery.getMessage().getChatId(), "Enter new note's text here ⬇️");
                     botState = BotState.EDIT_NOTE;
                     if (!buffer.isEmpty()) {
                         buffer.clear();
@@ -272,6 +299,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 default:
             }
 
+        } else if (tokens[0].equals("NoteStatus")) {
+            buffer.clear();
+            buffer.add(tokens[1]);
+            botState = BotState.CREATE_NOTE;
+            sendMessage(callbackQuery.getMessage().getChatId(), "Enter your note please:");
         } else {
             throw new NotYetImplementedException("We are still working on implementing this feature");
         }
@@ -322,6 +354,8 @@ public class TelegramBot extends TelegramLongPollingBot {
         Note note = new Note();
         Optional<User> user = userService.findUserById(chatId);
         note.setDescription(text);
+        note.setStatus(buffer.get(0));
+        buffer.clear();
         note.setDate(new Timestamp(System.currentTimeMillis()));
         user.ifPresent(note::setUser);
         noteService.saveNote(note);

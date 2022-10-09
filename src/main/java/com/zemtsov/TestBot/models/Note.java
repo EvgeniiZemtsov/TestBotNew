@@ -22,5 +22,8 @@ public class Note {
     @Column(name = "Created")
     private Timestamp date;
 
+    @Column(nullable = false)
+    private String status;
+
 
 }
