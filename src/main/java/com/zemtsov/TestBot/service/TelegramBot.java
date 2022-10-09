@@ -175,11 +175,45 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void showUsersNoteCommand(long chatId) {
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+        buttons.add(Arrays.asList(
+                InlineKeyboardButton
+                        .builder()
+                        .text("❗️Important")
+                        .callbackData("ShowNoteWithStatus:Important")
+                        .build(),
+                InlineKeyboardButton
+                        .builder()
+                        .text("⚠️Normal")
+                        .callbackData("ShowNoteWithStatus:Normal")
+                        .build(),
+                InlineKeyboardButton
+                        .builder()
+                        .text("\uD83D\uDCDDTo-Do")
+                        .callbackData("ShowNoteWithStatus:To-Do")
+                        .build()
+        ));
+        try {
+            execute(
+                    SendMessage.builder()
+                            .text("What kind of your notes would you like to see?")
+                            .chatId(String.valueOf(chatId))
+                            .replyMarkup(InlineKeyboardMarkup.builder().keyboard(buttons).build())
+                            .build());
+        } catch (TelegramApiException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void showUsersNote(long chatId, String status) {
         botState = BotState.DEFAULT;
         List<Note> allNotes = noteService.getAllNotes().isEmpty() ? Collections.emptyList() : noteService.getAllNotes();
         List<Note> usersNotes;
         if (!allNotes.isEmpty()) {
-            usersNotes = allNotes.stream().filter(note -> note.getUser().getChatId().equals(chatId)).collect(Collectors.toList());
+            usersNotes = allNotes.stream()
+                    .filter(note -> note.getUser().getChatId().equals(chatId))
+                    .filter(note -> note.getStatus().equals(status))
+                    .collect(Collectors.toList());
         } else {
             sendMessage(chatId, "There are no any notes in bot's db");
             return;
@@ -304,6 +338,8 @@ public class TelegramBot extends TelegramLongPollingBot {
             buffer.add(tokens[1]);
             botState = BotState.CREATE_NOTE;
             sendMessage(callbackQuery.getMessage().getChatId(), "Enter your note please:");
+        } else if (tokens[0].equals("ShowNoteWithStatus")) {
+            showUsersNote(callbackQuery.getMessage().getChatId(), tokens[1]);
         } else {
             throw new NotYetImplementedException("We are still working on implementing this feature");
         }
