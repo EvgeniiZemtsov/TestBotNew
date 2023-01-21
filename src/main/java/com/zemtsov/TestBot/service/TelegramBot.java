@@ -1,8 +1,10 @@
 package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
+import com.zemtsov.TestBot.handlers.TextHandler;
 import com.zemtsov.TestBot.models.Note;
 import com.zemtsov.TestBot.models.User;
+import com.zemtsov.TestBot.util.BotState;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.cfg.NotYetImplementedException;
@@ -36,8 +38,10 @@ public class TelegramBot extends TelegramLongPollingBot {
     private UserService userService;
     @Autowired
     private NoteService noteService;
+    @Autowired
+    private TextHandler textHandler;
 
-    BotState botState = BotState.STOPPED;
+    private BotState botState = BotState.STOPPED;
     List<String> buffer = new ArrayList<>();
 
     final BotConfig config;
@@ -115,7 +119,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         log.info("Executed command /help");
                         break;
                     default:
-                        handleTextMessage(messageText, chatId);
+                        textHandler.handleText(messageText, chatId, this);
                 }
 
             }
@@ -369,24 +373,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("Executed command /setemail");
     }
 
-    private void handleTextMessage(String text, long chatId) {
-        switch (botState) {
-            case SET_EMAIL:
-                setUsersEmail(text, chatId);
-                break;
-            case CREATE_NOTE:
-                createNote(text, chatId);
-                break;
-            case EDIT_NOTE:
-                editNote(text, chatId);
-                break;
-            default:
-                sendMessage(chatId, "Sorry, I don't understand what you're saying\nTry to send /start");
-                break;
-        }
-    }
-
-    private void createNote(String text, long chatId) {
+    public void createNote(String text, long chatId) {
         Note note = new Note();
         Optional<User> user = userService.findUserById(chatId);
         note.setDescription(text);
@@ -399,7 +386,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         log.info("New note was added by user with id " + chatId);
     }
 
-    private void editNote(String text, long chatId) {
+    public void editNote(String text, long chatId) {
         noteService.updateNote(Long.parseLong(buffer.get(0)), text);
 
         EditMessageText editMessage = new EditMessageText();
@@ -417,7 +404,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         botState = BotState.DEFAULT;
     }
 
-    private void setUsersEmail(String text, long chatId) {
+    public void setUsersEmail(String text, long chatId) {
         String emailRegex = "^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$";
         if (Pattern.matches(emailRegex, text)) {
             userService.updateUser(chatId, text, null);
@@ -427,7 +414,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendMessage(long chatId, String textToSend) {
+    public void sendMessage(long chatId, String textToSend) {
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(String.valueOf(chatId));
         sendMessage.setText(textToSend);
@@ -507,11 +494,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(chatId, userInf.toString());
     }
 
-    enum BotState {
-        DEFAULT,
-        CREATE_NOTE,
-        EDIT_NOTE,
-        SET_EMAIL,
-        STOPPED
+    public BotState getBotState() {
+        return botState;
+    }
+
+    public void setBotState(BotState botState) {
+        this.botState = botState;
     }
 }
