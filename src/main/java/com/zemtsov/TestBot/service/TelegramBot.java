@@ -1,23 +1,20 @@
 package com.zemtsov.TestBot.service;
 
 import com.zemtsov.TestBot.config.BotConfig;
+import com.zemtsov.TestBot.handlers.CallbackHandler;
 import com.zemtsov.TestBot.handlers.TextHandler;
 import com.zemtsov.TestBot.models.Note;
 import com.zemtsov.TestBot.models.User;
 import com.zemtsov.TestBot.util.BotState;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.cfg.NotYetImplementedException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
-import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Chat;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
@@ -40,6 +37,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     private NoteService noteService;
     @Autowired
     private TextHandler textHandler;
+    @Autowired
+    private CallbackHandler callbackHandler;
 
     private BotState botState = BotState.STOPPED;
     List<String> buffer = new ArrayList<>();
@@ -85,7 +84,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         } else if (botState != BotState.STOPPED) {
             if (update.hasCallbackQuery()) {
-                handleCallback(update.getCallbackQuery());
+                callbackHandler.handleCallback(update.getCallbackQuery(), this);
             }
 
             if (update.hasMessage() && update.getMessage().hasText()) {
@@ -121,7 +120,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                     default:
                         textHandler.handleText(messageText, chatId, this);
                 }
-
             }
         } else {
             sendMessage(update.getMessage().getChatId(),
@@ -209,7 +207,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void showUsersNote(long chatId, String status) {
+    public void showUsersNote(long chatId, String status) {
         botState = BotState.DEFAULT;
         List<Note> allNotes = noteService.getAllNotes().isEmpty() ? Collections.emptyList() : noteService.getAllNotes();
         List<Note> usersNotes;
@@ -282,71 +280,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         botState = BotState.DEFAULT;
         log.info("Executed command /setgender");
-    }
-
-    private void handleCallback(CallbackQuery callbackQuery) {
-        Message message = callbackQuery.getMessage();
-        log.info("Handling calbackQuery : " + callbackQuery.getData());
-
-        String[] tokens = callbackQuery.getData().split(":");
-        if (tokens[0].equals("Gender")) {
-            switch (tokens[1]) {
-                case "Male":
-                    userService.updateUser(message.getChatId(), null, "male");
-                    break;
-                case "Female":
-                    userService.updateUser(message.getChatId(), null, "female");
-                    break;
-                default:
-
-            }
-            try {
-                execute(AnswerCallbackQuery.builder()
-                        .cacheTime(10)
-                        .text("You've successfully set your gender. Now it's " + tokens[1])
-                        .showAlert(true)
-                        .callbackQueryId(callbackQuery.getId())
-                        .build());
-            } catch (TelegramApiException e) {
-                log.error(e.getMessage());
-            }
-        } else if (tokens[0].equals("NoteAction")) {
-            switch (tokens[1]) {
-                case "Edit":
-                    sendMessage(callbackQuery.getMessage().getChatId(), "Enter new note's text here ⬇️");
-                    botState = BotState.EDIT_NOTE;
-                    if (!buffer.isEmpty()) {
-                        buffer.clear();
-                    }
-                    buffer.add(tokens[2]);
-                    buffer.add(String.valueOf(callbackQuery.getMessage().getMessageId()));
-                    break;
-                case "Delete":
-                    noteService.deleteNoteById(Long.parseLong(tokens[2]));
-                    try {
-                        execute(AnswerCallbackQuery.builder()
-                                .cacheTime(10)
-                                .text("Note was deleted")
-                                .showAlert(true)
-                                .callbackQueryId(callbackQuery.getId())
-                                .build());
-                    } catch (TelegramApiException e) {
-                        log.error(e.getMessage());
-                    }
-                    break;
-                default:
-            }
-
-        } else if (tokens[0].equals("NoteStatus")) {
-            buffer.clear();
-            buffer.add(tokens[1]);
-            botState = BotState.CREATE_NOTE;
-            sendMessage(callbackQuery.getMessage().getChatId(), "Enter your note please:");
-        } else if (tokens[0].equals("ShowNoteWithStatus")) {
-            showUsersNote(callbackQuery.getMessage().getChatId(), tokens[1]);
-        } else {
-            throw new NotYetImplementedException("We are still working on implementing this feature");
-        }
     }
 
     private void startCommandAction(long chatId, String name) {
@@ -500,5 +433,25 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     public void setBotState(BotState botState) {
         this.botState = botState;
+    }
+
+    public UserService getUserService() {
+        return userService;
+    }
+
+    public NoteService getNoteService() {
+        return noteService;
+    }
+
+    public void bufferAppend(String token) {
+        buffer.add(token);
+    }
+
+    public void bufferClear() {
+        buffer.clear();
+    }
+
+    public List<String> getBuffer() {
+        return buffer;
     }
 }
